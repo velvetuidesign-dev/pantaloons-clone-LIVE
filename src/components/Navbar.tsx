@@ -3,20 +3,23 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCartStore } from '../store/cartStore';
+import { useState } from 'react'; // NEW: We need this for the mobile menu!
 
 export default function Navbar() {
   const cart = useCartStore((state) => state.cart);
-  const savedLocation = useCartStore((state) => state.savedLocation); // Ask the Brain!
+  const savedLocation = useCartStore((state) => state.savedLocation);
   const pathname = usePathname();
+  
+  // NEW: State to track if the mobile menu is open or closed
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // SMART LINK: If we have their location, go straight to the store. If not, ask them.
   const productsLink = savedLocation 
     ? `/near-me/${savedLocation.state.toLowerCase()}/${savedLocation.city.toLowerCase()}` 
     : '/products';
 
   const navLinks = [
     { name: 'HOME', path: '/' },
-    { name: 'PRODUCTS', path: productsLink }, // Uses the Smart Link
+    { name: 'PRODUCTS', path: productsLink },
     { name: 'OFFERS', path: '/offers' },
     { name: 'REVIEWS', path: '/reviews' },
     { name: 'ARTICLES', path: '/articles' },
@@ -24,21 +27,37 @@ export default function Navbar() {
     { name: 'ENQUIRY', path: '/enquiry' },
   ];
 
-  // ... (KEEP THE REST OF YOUR NAVBAR CODE EXACTLY THE SAME BELOW THIS) ...
-
-  // Logic to figure out which tab should have the Teal Underline
   const isActive = (path: string, name: string) => {
-    if (name === 'PRODUCTS' && pathname.includes('/near-me')) return true; // Keep Products highlighted in the store
+    if (name === 'PRODUCTS' && pathname.includes('/near-me')) return true;
     if (path === '/' && pathname !== '/') return false;
     return pathname.startsWith(path);
   };
 
   return (
-    // NOTE: z-40 is lower than the cart's z-[100], fixing the overlap bug!
     <header className="w-full bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm font-sans">
       <div className="max-w-[1600px] mx-auto px-4 md:px-8 flex items-center justify-between h-20">
         
-        {/* Navigation Links */}
+        {/* NEW: MOBILE HAMBURGER BUTTON (Only shows on phones) */}
+        <button 
+          className="md:hidden p-2 text-gray-900 focus:outline-none hover:text-teal-600 transition"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {isMobileMenuOpen ? (
+              <>
+                {/* An "X" icon when the menu is open */}
+                <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+              </>
+            ) : (
+              <>
+                {/* The 3 lines (Hamburger) when closed */}
+                <line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>
+              </>
+            )}
+          </svg>
+        </button>
+
+        {/* Desktop Navigation Links (Hidden on phones) */}
         <nav className="hidden md:flex items-center gap-6 lg:gap-8 overflow-x-auto">
           {navLinks.map((link) => {
             const active = isActive(link.path, link.name);
@@ -73,6 +92,28 @@ export default function Navbar() {
         </div>
 
       </div>
+
+      {/* NEW: MOBILE DROPDOWN MENU (Slides down when hamburger is clicked) */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden absolute top-20 left-0 w-full bg-white border-b border-gray-200 shadow-2xl py-6 px-8 flex flex-col gap-6 animate-in slide-in-from-top-4 duration-300">
+          {navLinks.map((link) => {
+            const active = isActive(link.path, link.name);
+            return (
+              <Link 
+                key={link.name} 
+                href={link.path} 
+                onClick={() => setIsMobileMenuOpen(false)} // Auto-close menu when a link is clicked!
+                className={`text-lg font-extrabold tracking-widest uppercase transition-all ${
+                  active ? 'text-teal-600' : 'text-gray-900 hover:text-teal-600'
+                }`}
+              >
+                {link.name}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
     </header>
   );
 }
