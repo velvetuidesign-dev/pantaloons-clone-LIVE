@@ -232,7 +232,7 @@ export default function StoreInventory({ availableCategories }: { availableCateg
       </div>
 
       {/* 6. Checkout Modal */}
-      {isCheckoutOpen && <CheckoutModal cartTotal={cartTotal} itemCount={cart.length} onClose={() => setIsCheckoutOpen(false)} onSuccess={() => { setIsCheckoutOpen(false); }} />}
+      {isCheckoutOpen && <CheckoutModal cartTotal={cartTotal} itemCount={cart.length} onClose={() => setIsCheckoutOpen(false)} />}
     </div>
   );
 }
