@@ -1,19 +1,36 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useCartStore } from '../store/cartStore'; 
+import { useState } from 'react';
 
 export default function Home() {
   const router = useRouter();
   
+  // NEW: Grab both the saved location and the ability to set it!
+  const { savedLocation, setLocation } = useCartStore();
+
   // State for the Location Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedState, setSelectedState] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
 
+  // NEW: The Smart Shop Button Logic
+  const handleSmartShopClick = () => {
+    if (savedLocation) {
+      // Teleport instantly if we already know where they are!
+      router.push(`/near-me/${savedLocation.state.toLowerCase()}/${savedLocation.city.toLowerCase()}`);
+    } else {
+      // Otherwise, ask them for their location
+      setIsModalOpen(true);
+    }
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedState && selectedCity) {
+      // NEW: Save it to the Global Brain before routing!
+      setLocation(selectedState, selectedCity);
       router.push(`/near-me/${selectedState.toLowerCase()}/${selectedCity.toLowerCase()}`);
     } else {
       alert("Please select both a state and a city!");
@@ -45,9 +62,9 @@ export default function Home() {
             Discover the latest trends in men's, women's, and kids' fashion at a premium Pantaloons store near you.
           </p>
           
-          {/* This button triggers the modal instead of routing! */}
+          {/* UPDATED: Triggers the Smart Logic! */}
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleSmartShopClick}
             className="bg-teal-600 text-white px-10 py-5 rounded-full font-extrabold text-lg md:text-xl hover:bg-white hover:text-gray-900 transition-all duration-300 shadow-[0_0_40px_rgba(13,148,136,0.4)] hover:shadow-[0_0_60px_rgba(255,255,255,0.6)] uppercase tracking-widest transform hover:-translate-y-1"
           >
             Shop The Collection
@@ -90,7 +107,7 @@ export default function Home() {
       </div>
 
       {/* ========================================= */}
-      {/* LOCATION PROMPT MODAL (From your matrix!) */}
+      {/* LOCATION PROMPT MODAL */}
       {/* ========================================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

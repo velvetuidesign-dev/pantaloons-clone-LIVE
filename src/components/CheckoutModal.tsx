@@ -1,134 +1,147 @@
 'use client';
 
 import { useState } from 'react';
+import { useCartStore } from '../store/cartStore';
+import { useAuthStore } from '../store/authStore'; 
 
-export default function CheckoutModal({ 
-  cartTotal, 
-  itemCount, 
-  onClose, 
-  onSuccess 
-}: { 
-  cartTotal: number, 
-  itemCount: number, 
-  onClose: () => void, 
-  onSuccess: () => void 
-}) {
-  // 0 = Form, 1 = Processing, 2 = Success
-  const [step, setStep] = useState(0);
+export default function CheckoutModal({ onClose, cartTotal, itemCount }: { onClose: () => void, cartTotal: number, itemCount: number }) {
+  const { cart } = useCartStore();
+  const { user, openAuthModal } = useAuthStore();
+  
+  const [isProcessingStripe, setIsProcessingStripe] = useState(false);
+  const [isProcessingCOD, setIsProcessingCOD] = useState(false);
+  // 1. STATE FOR THE BEAUTIFUL SUCCESS UI
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleMockPayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    setStep(1); // Trigger the Processing Skeleton
+  const handleStripeCheckout = async () => {
+    if (!user) {
+      onClose(); 
+      openAuthModal(); 
+      return; 
+    }
 
-    // Simulate network delay for 2.5 seconds, then show Success
-    setTimeout(() => {
-      setStep(2);
-    }, 2500);
+    setIsProcessingStripe(true); 
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          cart,
+          totalAmount: cartTotal,
+          customerName: user.name,
+          customerEmail: user.email
+        }),
+      });
+      const { url } = await response.json();
+      if (url) window.location.href = url;
+    } catch (error) {
+      setIsProcessingStripe(false);
+      alert("Error connecting to Stripe.");
+    }
+  };
+
+  const handleCODCheckout = async () => {
+    if (!user) {
+      onClose();
+      openAuthModal();
+      return; 
+    }
+
+    setIsProcessingCOD(true);
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          cart, 
+          totalAmount: cartTotal, 
+          paymentMethod: 'COD',
+          customerName: user.name,
+          customerEmail: user.email 
+        }),
+      });
+
+      if (response.ok) {
+        // 2. INSTEAD OF AN ALERT, SHOW THE SUCCESS UI!
+        setShowSuccess(true);
+      } else {
+        const errorData = await response.json();
+        alert("Server Error: " + errorData.error);
+        setIsProcessingCOD(false);
+      }
+    } catch (error) {
+      console.error("COD Error:", error);
+      alert("Something went wrong saving the order!");
+      setIsProcessingCOD(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
-      {/* Dark Glassmorphism Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
-        onClick={step === 0 ? onClose : undefined} // Only allow closing if still on the form
-      />
-
-      {/* The Modal Container */}
-      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col transform transition-all">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
         
-        {/* === STEP 0: MINIMALIST CHECKOUT FORM === */}
-        {step === 0 && (
-          <div className="flex flex-col md:flex-row h-full">
-            {/* Left Side: The Form */}
-            <div className="flex-1 p-8 sm:p-12">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Checkout</h2>
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-900 transition">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                </button>
-              </div>
-
-              <form onSubmit={handleMockPayment} className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Email Address</label>
-                  <input required type="email" placeholder="you@example.com" className="w-full border-b-2 border-gray-200 py-2 focus:outline-none focus:border-orange-600 transition-colors text-gray-900 font-medium bg-transparent" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Card Details (Mock)</label>
-                  <input required type="text" placeholder="1234 5678 9101 1121" maxLength={16} className="w-full border-b-2 border-gray-200 py-2 focus:outline-none focus:border-orange-600 transition-colors text-gray-900 font-medium tracking-widest bg-transparent" />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Expiry</label>
-                    <input required type="text" placeholder="MM/YY" maxLength={5} className="w-full border-b-2 border-gray-200 py-2 focus:outline-none focus:border-orange-600 transition-colors text-gray-900 font-medium bg-transparent" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">CVC</label>
-                    <input required type="text" placeholder="123" maxLength={3} className="w-full border-b-2 border-gray-200 py-2 focus:outline-none focus:border-orange-600 transition-colors text-gray-900 font-medium bg-transparent" />
-                  </div>
-                </div>
-                
-                <button type="submit" className="w-full bg-gray-900 text-white font-extrabold py-5 rounded-xl mt-8 hover:bg-orange-600 transition-colors shadow-lg uppercase tracking-widest">
-                  Pay ₹ {cartTotal.toLocaleString('en-IN')}
-                </button>
-              </form>
+        {/* THE SUCCESS UI OR THE CART UI */}
+        {showSuccess ? (
+          <div className="p-10 text-center flex flex-col items-center animate-in slide-in-from-bottom-4 duration-500">
+            <div className="w-24 h-24 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mb-6 shadow-inner">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
             </div>
-
-            {/* Right Side: Order Summary */}
-            <div className="w-full md:w-1/3 bg-gray-50 p-8 sm:p-12 border-l border-gray-100 flex flex-col justify-center">
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-6">Order Summary</h3>
-              <div className="flex justify-between items-center mb-4 text-gray-700">
-                <span>Items ({itemCount})</span>
-                <span className="font-bold">₹ {cartTotal.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between items-center mb-6 text-gray-700">
-                <span>Shipping</span>
-                <span className="font-bold text-green-600">Free</span>
-              </div>
-              <div className="pt-6 border-t border-gray-200 flex justify-between items-center">
-                <span className="font-bold text-gray-900">Total</span>
-                <span className="text-2xl font-extrabold text-gray-900">₹ {cartTotal.toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* === STEP 1: PROCESSING SKELETON === */}
-        {step === 1 && (
-          <div className="p-20 flex flex-col items-center justify-center min-h-[400px]">
-            {/* Spinning Loader */}
-            <div className="w-16 h-16 border-4 border-gray-100 border-t-orange-600 rounded-full animate-spin mb-10"></div>
-            
-            {/* Pulsing Text Skeletons */}
-            <h3 className="text-2xl font-extrabold text-gray-900 mb-6 tracking-tight animate-pulse">Processing Payment securely...</h3>
-            <div className="w-64 h-4 bg-gray-200 rounded-full animate-pulse mb-3"></div>
-            <div className="w-48 h-4 bg-gray-100 rounded-full animate-pulse"></div>
-          </div>
-        )}
-
-        {/* === STEP 2: SUCCESS SCREEN === */}
-        {step === 2 && (
-          <div className="p-20 flex flex-col items-center justify-center min-h-[400px] text-center bg-green-50">
-            {/* Animated Green Checkmark Box */}
-            <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_50px_rgba(34,197,94,0.4)] animate-[bounce_1s_ease-in-out_1]">
-              <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            
-            <h2 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight uppercase">Successfully Ordered!</h2>
-            <p className="text-green-800 font-medium mb-10 text-lg">Your mock payment was approved. We are packing your gear.</p>
-            
+            <h2 className="text-3xl font-black text-gray-900 mb-2 uppercase tracking-tight">Confirmed!</h2>
+            <p className="text-gray-500 font-medium mb-8 leading-relaxed">
+              Thank you, {user?.name.split(' ')[0]}!<br/>Your order has been received and is currently being prepared for delivery.
+            </p>
             <button 
-              onClick={onSuccess} // This triggers the cart clearing!
-              className="bg-gray-900 text-white px-10 py-4 rounded-xl font-bold hover:bg-green-600 transition-colors shadow-xl uppercase tracking-widest"
+              onClick={() => window.location.href = '/'} // Refreshes app to clear cart and start over
+              className="w-full bg-gray-900 text-white font-extrabold py-4 rounded-xl shadow-lg hover:bg-teal-600 transition-colors uppercase tracking-widest"
             >
               Continue Shopping
             </button>
           </div>
-        )}
+        ) : (
+          <div className="p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-extrabold text-gray-900 uppercase tracking-tight">Order Summary</h2>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-900 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
 
+            <div className="bg-gray-50 rounded-xl p-6 mb-8 border border-gray-100">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-gray-500 font-medium">Items ({itemCount})</span>
+                <span className="font-bold text-gray-900">₹ {cartTotal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-gray-500 font-medium">Shipping</span>
+                <span className="font-bold text-teal-600">FREE</span>
+              </div>
+              <div className="border-t border-gray-200 my-4"></div>
+              <div className="flex justify-between items-center">
+                <span className="text-xl font-extrabold text-gray-900">Total</span>
+                <span className="text-2xl font-extrabold text-teal-600">₹ {cartTotal.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={handleStripeCheckout} 
+                disabled={isProcessingStripe || isProcessingCOD}
+                className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow hover:bg-blue-700 transition-colors flex justify-center items-center gap-2"
+              >
+                {isProcessingStripe ? "Connecting..." : "💳 Pay Securely with Card"}
+              </button>
+
+              <button 
+                onClick={handleCODCheckout} 
+                disabled={isProcessingStripe || isProcessingCOD}
+                className="w-full bg-gray-900 text-white font-bold py-4 rounded-xl shadow hover:bg-gray-800 transition-colors flex justify-center items-center gap-2"
+              >
+                {isProcessingCOD ? "Saving Order..." : "📦 Cash on Delivery"}
+              </button>
+            </div>
+          </div>
+        )}
+        
       </div>
     </div>
   );

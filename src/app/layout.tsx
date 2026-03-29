@@ -1,3 +1,4 @@
+import AuthModal from '../components/AuthModal';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -20,10 +21,15 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.className} antialiased bg-gray-50 text-gray-900 min-h-screen flex flex-col`}>
         <Navbar />
+        
         <div className="flex-grow">
           {children}
         </div>
+        
         <Footer />
+        
+        {/* The Login Popup waiting in the background! */}
+        <AuthModal />
       </body>
     </html>
   );
